@@ -1,0 +1,426 @@
+import sys
+import requests
+
+from datetime import datetime, timedelta, timezone
+
+
+# ============================================================
+# APPLICATION CONFIGURATION
+# ============================================================
+
+APP_NAME = "PROFESSIONAL WEATHER APPLICATION"
+APP_VERSION = "2.0.0"
+
+API_KEY = "ec03e8b02716fa53dcba1a68c8d55d64"
+
+BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
+
+DEFAULT_UNITS = "metric"
+REQUEST_TIMEOUT = 15
+
+WIDTH = 60
+
+
+# ============================================================
+# TERMINAL DESIGN
+# ============================================================
+
+def print_line():
+    print("=" * WIDTH)
+
+
+def print_header():
+
+    print("\n")
+    print_line()
+
+    print(f"          🌤️  {APP_NAME}")
+    print(f"                   Version {APP_VERSION}")
+
+    print_line()
+
+    print("       Real-Time Weather Information System")
+
+    print_line()
+
+
+# ============================================================
+# WEATHER CONDITION EMOJIS
+# ============================================================
+
+def get_weather_emoji(condition):
+
+    emojis = {
+        "Clear": "☀️",
+        "Clouds": "☁️",
+        "Rain": "🌧️",
+        "Drizzle": "🌦️",
+        "Thunderstorm": "⛈️",
+        "Snow": "❄️",
+        "Mist": "🌫️",
+        "Smoke": "🌫️",
+        "Haze": "🌫️",
+        "Dust": "🌪️",
+        "Fog": "🌫️",
+        "Sand": "🌪️",
+        "Ash": "🌋",
+        "Squall": "💨",
+        "Tornado": "🌪️"
+    }
+
+    return emojis.get(condition, "🌤️")
+
+
+# ============================================================
+# WEATHER API SERVICE
+# ============================================================
+
+def get_weather(city, units=DEFAULT_UNITS):
+
+    params = {
+        "q": city,
+        "appid": API_KEY,
+        "units": units
+    }
+
+    try:
+
+        response = requests.get(
+            BASE_URL,
+            params=params,
+            timeout=REQUEST_TIMEOUT
+        )
+
+        if response.status_code == 200:
+
+            return response.json()
+
+        elif response.status_code == 400:
+
+            print("\n❌ Invalid city request.")
+
+        elif response.status_code == 401:
+
+            print("\n❌ Invalid or inactive API key.")
+            print("Please check your OpenWeatherMap API key.")
+
+        elif response.status_code == 404:
+
+            print("\n❌ City not found.")
+            print("Please enter a valid city name.")
+
+        elif response.status_code == 429:
+
+            print("\n❌ API request limit exceeded.")
+
+        else:
+
+            print(f"\n❌ API Error: {response.status_code}")
+            print(response.text)
+
+    except requests.exceptions.Timeout:
+
+        print("\n❌ Request timed out. Please try again.")
+
+    except requests.exceptions.ConnectionError:
+
+        print("\n❌ Unable to connect to the internet.")
+
+    except requests.exceptions.RequestException as error:
+
+        print(f"\n❌ Request failed: {error}")
+
+    return None
+
+
+# ============================================================
+# TIME CONVERSION
+# ============================================================
+
+def get_local_time(timestamp, timezone_offset):
+
+    local_timezone = timezone(
+        timedelta(seconds=timezone_offset)
+    )
+
+    return datetime.fromtimestamp(
+        timestamp,
+        tz=local_timezone
+    ).strftime("%I:%M %p")
+
+
+def get_city_current_time(timezone_offset):
+
+    city_timezone = timezone(
+        timedelta(seconds=timezone_offset)
+    )
+
+    return datetime.now(
+        city_timezone
+    ).strftime("%d %b %Y, %I:%M %p")
+
+
+# ============================================================
+# TEMPERATURE UNIT CONFIGURATION
+# ============================================================
+
+def get_unit_labels(units):
+
+    if units == "metric":
+
+        return "°C", "m/s"
+
+    elif units == "imperial":
+
+        return "°F", "mph"
+
+    return "K", "m/s"
+
+
+# ============================================================
+# WEATHER REPORT
+# ============================================================
+
+def display_weather(data, units=DEFAULT_UNITS):
+
+    try:
+
+        # Location information
+
+        city = data["name"]
+        country = data["sys"]["country"]
+
+        timezone_offset = data.get("timezone", 0)
+
+        local_time = get_city_current_time(
+            timezone_offset
+        )
+
+        # Weather information
+
+        weather = data["weather"][0]
+
+        condition = weather["main"]
+        description = weather["description"].title()
+
+        emoji = get_weather_emoji(condition)
+
+        # Temperature information
+
+        main = data["main"]
+
+        temperature = main["temp"]
+        feels_like = main["feels_like"]
+
+        minimum = main["temp_min"]
+        maximum = main["temp_max"]
+
+        # Atmospheric information
+
+        humidity = main["humidity"]
+        pressure = main["pressure"]
+
+        wind_speed = data.get("wind", {}).get("speed", 0)
+
+        visibility = data.get("visibility", 0) / 1000
+
+        # Sun information
+
+        sunrise = get_local_time(
+            data["sys"]["sunrise"],
+            timezone_offset
+        )
+
+        sunset = get_local_time(
+            data["sys"]["sunset"],
+            timezone_offset
+        )
+
+        temp_unit, wind_unit = get_unit_labels(units)
+
+        # Display weather report
+
+        print("\n")
+        print_line()
+
+        print("                  🌤️ WEATHER REPORT")
+
+        print_line()
+
+        print(f" 📍 Location       : {city}, {country}")
+        print(f" 🕒 Local Time     : {local_time}")
+
+        print("-" * WIDTH)
+
+        print(" WEATHER CONDITIONS")
+
+        print(f" {emoji} Weather        : {condition}")
+        print(f" ☁️ Description    : {description}")
+
+        print("-" * WIDTH)
+
+        print(" TEMPERATURE DETAILS")
+
+        print(
+            f" 🌡️ Current        : "
+            f"{temperature:.1f}{temp_unit}"
+        )
+
+        print(
+            f" 🤗 Feels Like     : "
+            f"{feels_like:.1f}{temp_unit}"
+        )
+
+        print(
+            f" ⬇️ Minimum        : "
+            f"{minimum:.1f}{temp_unit}"
+        )
+
+        print(
+            f" ⬆️ Maximum        : "
+            f"{maximum:.1f}{temp_unit}"
+        )
+
+        print("-" * WIDTH)
+
+        print(" ATMOSPHERIC CONDITIONS")
+
+        print(f" 💧 Humidity       : {humidity}%")
+        print(f" 📊 Pressure       : {pressure} hPa")
+
+        print(
+            f" 🌬️ Wind Speed     : "
+            f"{wind_speed} {wind_unit}"
+        )
+
+        print(f" 👁️ Visibility     : {visibility:.1f} km")
+
+        print("-" * WIDTH)
+
+        print(" SUN INFORMATION")
+
+        print(f" 🌅 Sunrise        : {sunrise}")
+        print(f" 🌇 Sunset         : {sunset}")
+
+        print_line()
+
+    except (KeyError, IndexError, TypeError, ValueError) as error:
+
+        print("\n❌ Unable to process weather information.")
+        print(f"Details: {error}")
+
+
+# ============================================================
+# TEMPERATURE UNIT SELECTION
+# ============================================================
+
+def select_units():
+
+    print("\n")
+    print("SELECT TEMPERATURE UNIT")
+
+    print("-" * 35)
+
+    print(" 1. Celsius       (°C)")
+    print(" 2. Fahrenheit    (°F)")
+    print(" 3. Kelvin        (K)")
+
+    print("-" * 35)
+
+    choices = {
+        "1": "metric",
+        "2": "imperial",
+        "3": "standard"
+    }
+
+    while True:
+
+        choice = input(
+            "\nEnter your choice (1-3): "
+        ).strip()
+
+        if choice in choices:
+
+            return choices[choice]
+
+        print("⚠️ Invalid selection. Please choose 1, 2 or 3.")
+
+
+# ============================================================
+# MAIN APPLICATION
+# ============================================================
+
+def main():
+
+    # Validate API key
+
+    if (
+        not API_KEY
+        or API_KEY == "PASTE_YOUR_WORKING_API_KEY_HERE"
+    ):
+
+        print("\n❌ Please configure your OpenWeatherMap API key.")
+        sys.exit(1)
+
+    # Application header
+
+    print_header()
+
+    # Select temperature unit
+
+    units = select_units()
+
+    # Main application loop
+
+    while True:
+
+        print("\n")
+
+        city = input(
+            "📍 Enter city name (or 'q' to quit): "
+        ).strip()
+
+        # Exit application
+
+        if city.lower() in ["q", "quit", "exit"]:
+
+            print("\n")
+
+            print_line()
+
+            print("  👋 Thank you for using Weather Application!")
+            print("  Stay safe and have a great day!")
+
+            print_line()
+
+            break
+
+        # Validate city input
+
+        if not city:
+
+            print("\n⚠️ City name cannot be empty.")
+            continue
+
+        # Fetch weather information
+
+        print(
+            f"\n⏳ Fetching weather information for {city}..."
+        )
+
+        data = get_weather(city, units)
+
+        # Display weather report
+
+        if data:
+
+            display_weather(data, units)
+
+
+# ============================================================
+# APPLICATION ENTRY POINT
+# ============================================================
+
+if _name_ == "_main_":
+
+    main()
